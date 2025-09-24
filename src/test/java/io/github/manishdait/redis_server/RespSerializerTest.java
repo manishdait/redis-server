@@ -1,7 +1,9 @@
-package io.github.manishdait;
+package io.github.manishdait.redis_server;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import io.github.manishdait.redis_server.RespSerializer;
 
 public class RespSerializerTest {
   @Test

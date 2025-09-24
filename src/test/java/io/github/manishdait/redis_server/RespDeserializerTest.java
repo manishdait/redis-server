@@ -1,10 +1,12 @@
-package io.github.manishdait;
+package io.github.manishdait.redis_server;
 
 import java.io.IOException;
 
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
+
+import io.github.manishdait.redis_server.RespDeserializer;
 
 public class RespDeserializerTest {
   @Test

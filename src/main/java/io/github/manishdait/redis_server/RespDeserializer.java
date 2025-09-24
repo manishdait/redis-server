@@ -1,4 +1,4 @@
-package io.github.manishdait;
+package io.github.manishdait.redis_server;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
