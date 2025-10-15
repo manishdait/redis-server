@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
-  private static final Map<String, Object> MAP = new HashMap<>();
+  private static final Map<String, Entity> MAP = new HashMap<>();
 
   public static void main(String[] args) throws IOException {
     int PORT = 6379;
@@ -25,7 +25,7 @@ public class Main {
     }
   }
 
-  public static Map<String, Object> getMap() {
+  public static Map<String, Entity> getMap() {
     return Main.MAP;
   }
 }

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Arrays;
 
 import org.slf4j.Logger;
@@ -38,7 +39,7 @@ public class SocketHandler implements Runnable {
             returnSimple((String) args[1]);
             break;
           case "SET":
-            set((String) args[1], args[2]);
+            set(args);
             break;
           case "GET":
             get((String) args[1]);
@@ -60,9 +61,50 @@ public class SocketHandler implements Runnable {
     }
   }
 
-  private void set(String key, Object value) throws IOException { 
-    Main.getMap().put(key, (String) value);
-    logger.debug("SET {} = {}", key, value);
+  private void set(Object[] args) throws IOException { 
+    String key = (String) args[1];
+    String value = (String) args[2];
+
+    Entity entity = new Entity(key, value, null);
+
+    for (int i = 3; i < args.length; i++) {
+      if (((String) args[i]).toLowerCase().equals("NX".toLowerCase())) {
+        if (Main.getMap().containsKey(key)) {
+          socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+          return;
+        }
+      }
+
+      else if (((String) args[i]).toLowerCase().equals("XX".toLowerCase())) {
+        if (!Main.getMap().containsKey(key)) {
+          socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+          return;
+        }
+      }
+
+      else if (((String)args[i]).toLowerCase().equals("EX".toLowerCase())) {
+        i++;
+        entity.setExpiration(Instant.now().plusSeconds(Integer.parseInt((String) args[i])));
+      }
+
+      else if (((String)args[i]).toLowerCase().equals("PX".toLowerCase())) {
+        i++;
+        entity.setExpiration(Instant.now().plusMillis(Integer.parseInt((String) args[i])));
+      }
+
+      else if (((String)args[i]).toLowerCase().equals("EXAT".toLowerCase())) {
+        i++;
+        entity.setExpiration(Instant.ofEpochSecond(Long.parseLong((String) args[i])));
+      }
+
+      else if (((String)args[i]).toLowerCase().equals("PX".toLowerCase())) {
+        i++;
+        entity.setExpiration(Instant.ofEpochMilli(Long.parseLong((String) args[i])));
+      }
+    }
+
+    Main.getMap().put(key, entity);
+    logger.debug("SET {} = {}", key, entity);
 
     returnSimple("OK");
   }
@@ -75,12 +117,12 @@ public class SocketHandler implements Runnable {
       return;
     }
 
-    Object value = Main.getMap().get(key);
+    Entity value = Main.getMap().get(key);
     
-    if (value instanceof Object[]) {
-      returnArray((Object[]) value);
+    if (value.getValue() instanceof Object[]) {
+      returnArray((Object[]) value.getValue());
     } else {
-      returnBulk((String) value);
+      returnBulk((String) value.getValue());
     }
 
     logger.debug("GET {} -> {}", key, value);
@@ -92,8 +134,8 @@ public class SocketHandler implements Runnable {
       return;
     }
 
-    Long val = (Long.parseLong((String) Main.getMap().get(key))) + 1;
-    Main.getMap().put(key, String.valueOf(val));
+    Long val = (Long.parseLong((String) Main.getMap().get(key).getValue())) + 1;
+    Main.getMap().get(key).setValue(String.valueOf(val));
     
     returnInteger(val);
     logger.debug("INCR {} -> {}", key, val);
