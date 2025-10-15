@@ -47,6 +47,9 @@ public class SocketHandler implements Runnable {
           case "INCR":
             incr((String) args[1]);
             break;
+          case "DECR":
+            decr((String) args[1]);
+            break;
           case "COMMAND":
             returnSimple("");
             break;
@@ -139,6 +142,19 @@ public class SocketHandler implements Runnable {
     
     returnInteger(val);
     logger.debug("INCR {} -> {}", key, val);
+  }
+
+  private void decr(String key) throws IOException {
+     if (!exists(key)) {
+      socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      return;
+    }
+
+    Long val = (Long.parseLong((String) Main.getMap().get(key).getValue())) - 1;
+    Main.getMap().get(key).setValue(String.valueOf(val));
+    
+    returnInteger(val);
+    logger.debug("DECR {} -> {}", key, val);
   }
 
   private boolean exists(String key){
