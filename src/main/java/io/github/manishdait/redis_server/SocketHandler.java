@@ -6,14 +6,18 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SocketHandler implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(SocketHandler.class);
-  private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private final Socket socket;
+  
+  private static final Charset UTF_8 = StandardCharsets.UTF_8;
+  private static final byte[] NIL = "$-1\r\n".getBytes(UTF_8);
+  private static final Map<String, Entity> MAP = Main.getMap();
 
   public SocketHandler(Socket socket) {
     this.socket = socket;
@@ -27,7 +31,7 @@ public class SocketHandler implements Runnable {
 
       while(true) {
         Object[] args = (Object[]) deserializer.decode();
-        String command = ((String) args[0]).toUpperCase();
+        String command = toString(args[0]).toUpperCase();
 
         logger.debug("Processing command: {} | Args: {}", command, Arrays.toString(args));
 
@@ -36,19 +40,19 @@ public class SocketHandler implements Runnable {
             returnSimple("PONG");
             break;
           case "ECHO":
-            returnSimple((String) args[1]);
+            returnSimple(toString(args[1]));
             break;
           case "SET":
             set(args);
             break;
           case "GET":
-            get((String) args[1]);
+            get(toString(args[1]));
             break;
           case "INCR":
-            incr((String) args[1]);
+            incr(toString(args[1]));
             break;
           case "DECR":
-            decr((String) args[1]);
+            decr(toString(args[1]));
             break;
           case "EXISTS":
             exists(args);
@@ -71,48 +75,50 @@ public class SocketHandler implements Runnable {
   }
 
   private void set(Object[] args) throws IOException { 
-    String key = (String) args[1];
-    String value = (String) args[2];
+    String key = toString(args[1]);
+    String value = toString(args[2]);
 
     Entity entity = new Entity(key, value, null);
 
     for (int i = 3; i < args.length; i++) {
-      if (((String) args[i]).toLowerCase().equals("NX".toLowerCase())) {
-        if (Main.getMap().containsKey(key)) {
-          socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      String arg = toString(args[i]);
+
+      if (arg.toUpperCase().equals("NX")) {
+        if (MAP.containsKey(key)) {
+          socket.getOutputStream().write(NIL);
           return;
         }
       }
 
-      else if (((String) args[i]).toLowerCase().equals("XX".toLowerCase())) {
-        if (!Main.getMap().containsKey(key)) {
-          socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      else if (arg.toUpperCase().equals("XX")) {
+        if (!MAP.containsKey(key)) {
+          socket.getOutputStream().write(NIL);
           return;
         }
       }
 
-      else if (((String)args[i]).toLowerCase().equals("EX".toLowerCase())) {
+      else if (arg.toUpperCase().equals("EX")) {
         i++;
-        entity.setExpiration(Instant.now().plusSeconds(Integer.parseInt((String) args[i])));
+        entity.setExpiration(Instant.now().plusSeconds(toInt(args[i])));
       }
 
-      else if (((String)args[i]).toLowerCase().equals("PX".toLowerCase())) {
+      else if (arg.toUpperCase().equals("PX")) {
         i++;
-        entity.setExpiration(Instant.now().plusMillis(Integer.parseInt((String) args[i])));
+        entity.setExpiration(Instant.now().plusMillis(toInt(args[i])));
       }
 
-      else if (((String)args[i]).toLowerCase().equals("EXAT".toLowerCase())) {
+      else if (arg.toUpperCase().equals("EXAT")) {
         i++;
-        entity.setExpiration(Instant.ofEpochSecond(Long.parseLong((String) args[i])));
+        entity.setExpiration(Instant.ofEpochSecond(toLong(args[i])));
       }
 
-      else if (((String)args[i]).toLowerCase().equals("PX".toLowerCase())) {
+      else if (arg.toUpperCase().equals("PX")) {
         i++;
-        entity.setExpiration(Instant.ofEpochMilli(Long.parseLong((String) args[i])));
+        entity.setExpiration(Instant.ofEpochMilli(toLong(args[i])));
       }
     }
 
-    Main.getMap().put(key, entity);
+    MAP.put(key, entity);
     logger.debug("SET {} = {}", key, entity);
 
     returnSimple("OK");
@@ -120,13 +126,13 @@ public class SocketHandler implements Runnable {
 
   private void get(String key) throws IOException {
     if (!exists(key)) {
-      socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      socket.getOutputStream().write(NIL);
       logger.debug("GET {} -> (nil)", key);
 
       return;
     }
 
-    Entity value = Main.getMap().get(key);
+    Entity value = MAP.get(key);
     
     if (value.getValue() instanceof Object[]) {
       returnArray((Object[]) value.getValue());
@@ -139,12 +145,12 @@ public class SocketHandler implements Runnable {
 
   private void incr(String key) throws IOException {
      if (!exists(key)) {
-      socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      socket.getOutputStream().write(NIL);
       return;
     }
 
-    Long val = (Long.parseLong((String) Main.getMap().get(key).getValue())) + 1;
-    Main.getMap().get(key).setValue(String.valueOf(val));
+    Long val = toLong(MAP.get(key).getValue()) + 1;
+    MAP.get(key).setValue(String.valueOf(val));
     
     returnInteger(val);
     logger.debug("INCR {} -> {}", key, val);
@@ -152,12 +158,12 @@ public class SocketHandler implements Runnable {
 
   private void decr(String key) throws IOException {
      if (!exists(key)) {
-      socket.getOutputStream().write("$-1\r\n".getBytes(UTF_8));
+      socket.getOutputStream().write(NIL);
       return;
     }
 
-    Long val = (Long.parseLong((String) Main.getMap().get(key).getValue())) - 1;
-    Main.getMap().get(key).setValue(String.valueOf(val));
+    Long val = toLong(MAP.get(key)) - 1;
+    MAP.get(key).setValue(String.valueOf(val));
     
     returnInteger(val);
     logger.debug("DECR {} -> {}", key, val);
@@ -167,8 +173,8 @@ public class SocketHandler implements Runnable {
     int count = 0;
 
     for (int i = 1; i < args.length; i++) {
-      String key = (String) args[i];
-      if (Main.getMap().containsKey(key)) {
+      String key = toString(args[i]);
+      if (MAP.containsKey(key)) {
         count++;
       }
     }
@@ -180,9 +186,9 @@ public class SocketHandler implements Runnable {
     int count = 0;
 
     for (int i = 1; i < args.length; i++) {
-      String key = (String) args[i];
-      if (Main.getMap().containsKey(key)) {
-        Main.getMap().remove(key);
+      String key = toString(args[i]);
+      if (MAP.containsKey(key)) {
+        MAP.remove(key);
         count++;
       }
     }
@@ -191,9 +197,22 @@ public class SocketHandler implements Runnable {
   }
 
   private boolean exists(String key){
-    return Main.getMap().containsKey(key);
+    return MAP.containsKey(key);
   }
 
+  private String toString(Object obj) {
+    return (String) obj;
+  }
+
+  private Integer toInt(Object obj) {
+    return Integer.parseInt(toString(obj));
+  }
+
+  private Long toLong(Object obj) {
+    return Long.parseLong(toString(obj));
+  }
+
+  
   private void returnSimple(String str) throws IOException {
     socket.getOutputStream().write(RespSerializer.toSimpleString(str).getBytes(UTF_8));
     logger.trace("Sent Simple String: {}", str);
