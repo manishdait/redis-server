@@ -53,6 +53,9 @@ public class SocketHandler implements Runnable {
           case "EXISTS":
             exists(args);
             break;
+          case "DEL":
+            del(args);
+            break;
           case "COMMAND":
             returnSimple("");
             break;
@@ -166,6 +169,20 @@ public class SocketHandler implements Runnable {
     for (int i = 1; i < args.length; i++) {
       String key = (String) args[i];
       if (Main.getMap().containsKey(key)) {
+        count++;
+      }
+    }
+
+    returnInteger(count);
+  }
+
+  private void del(Object[] args) throws IOException{
+    int count = 0;
+
+    for (int i = 1; i < args.length; i++) {
+      String key = (String) args[i];
+      if (Main.getMap().containsKey(key)) {
+        Main.getMap().remove(key);
         count++;
       }
     }
