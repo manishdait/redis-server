@@ -122,7 +122,7 @@ public class SocketHandler implements Runnable {
         rString.setExpirationSeconds(toLong(args[++i]));
       }
 
-      else if (arg.toUpperCase().equals("PX")) {
+      else if (arg.toUpperCase().equals("PXAT")) {
         rString.setExpirationMills(toLong(args[++i]));
       }
     }
