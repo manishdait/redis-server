@@ -4,28 +4,30 @@ import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Arrays;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.github.manishdait.redis_server.types.RList;
+import io.github.manishdait.redis_server.types.RMap;
+import io.github.manishdait.redis_server.types.RString;
+
 public class SocketHandler implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(SocketHandler.class);
-  private final Socket socket;
   
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
-  private static final byte[] NIL = "$-1\r\n".getBytes(UTF_8);
-  private static final Map<String, Entity> MAP = Main.getMap();
+  private static final RMap MAP = Main.getMap();
+  
+  private final Socket socket;
 
   public SocketHandler(Socket socket) {
+    logger.info("Client connected: {}", socket.getRemoteSocketAddress());
     this.socket = socket;
   }
 
   @Override
   public void run() {
-    logger.info("Client connected: {}", socket.getRemoteSocketAddress());
     try {
       RespDeserializer deserializer = (RespDeserializer) new RespDeserializer(socket.getInputStream());
 
@@ -60,6 +62,9 @@ public class SocketHandler implements Runnable {
           case "DEL":
             del(args);
             break;
+          case "LPUSH":
+            lpush(args);
+            break;
           case "COMMAND":
             returnSimple("");
             break;
@@ -76,97 +81,107 @@ public class SocketHandler implements Runnable {
 
   private void set(Object[] args) throws IOException { 
     String key = toString(args[1]);
-    String value = toString(args[2]);
 
-    Entity entity = new Entity(key, value, null);
+    RString rString = new RString(toString(args[2]));
 
     for (int i = 3; i < args.length; i++) {
       String arg = toString(args[i]);
 
       if (arg.toUpperCase().equals("NX")) {
-        if (MAP.containsKey(key)) {
-          socket.getOutputStream().write(NIL);
+        if (MAP.contains(key)) {
+          returnNil();
           return;
         }
       }
 
       else if (arg.toUpperCase().equals("XX")) {
-        if (!MAP.containsKey(key)) {
-          socket.getOutputStream().write(NIL);
+        if (!MAP.contains(key)) {
+          returnNil();
           return;
         }
       }
 
       else if (arg.toUpperCase().equals("EX")) {
-        i++;
-        entity.setExpiration(Instant.now().plusSeconds(toInt(args[i])));
+        rString.plusSeconds(toLong(args[++i]));
       }
 
       else if (arg.toUpperCase().equals("PX")) {
-        i++;
-        entity.setExpiration(Instant.now().plusMillis(toInt(args[i])));
+        rString.plusMilliSeconds(toLong(args[++i]));
       }
 
       else if (arg.toUpperCase().equals("EXAT")) {
-        i++;
-        entity.setExpiration(Instant.ofEpochSecond(toLong(args[i])));
+        rString.setExpirationSeconds(toLong(args[++i]));
       }
 
       else if (arg.toUpperCase().equals("PX")) {
-        i++;
-        entity.setExpiration(Instant.ofEpochMilli(toLong(args[i])));
+        rString.setExpirationMills(toLong(args[++i]));
       }
     }
 
-    MAP.put(key, entity);
-    logger.debug("SET {} = {}", key, entity);
+    MAP.put(key, rString);
+    logger.debug("SET {} = {}", key, rString);
 
     returnSimple("OK");
   }
 
   private void get(String key) throws IOException {
     if (!exists(key)) {
-      socket.getOutputStream().write(NIL);
+      returnNil();
       logger.debug("GET {} -> (nil)", key);
-
       return;
     }
 
-    Entity value = MAP.get(key);
-    
-    if (value.getValue() instanceof Object[]) {
-      returnArray((Object[]) value.getValue());
-    } else {
-      returnBulk((String) value.getValue());
-    }
+    try {
+      RString rString = MAP.getString(key);
+      returnBulk(rString.getValue());
 
-    logger.debug("GET {} -> {}", key, value);
+      logger.debug("GET {} -> {}", key, rString);
+    } catch (Exception e) {
+      returnError(e.getMessage());
+      logger.error("GET {} -> {}", key, e.getMessage());
+    }
   }
 
   private void incr(String key) throws IOException {
-     if (!exists(key)) {
-      socket.getOutputStream().write(NIL);
+    if (!exists(key)) {
+      returnNil();
+      logger.debug("INCR {} -> (nil)", key);
       return;
     }
 
-    Long val = toLong(MAP.get(key).getValue()) + 1;
-    MAP.get(key).setValue(String.valueOf(val));
-    
-    returnInteger(val);
-    logger.debug("INCR {} -> {}", key, val);
+    try {
+      RString rString = MAP.getString(key);
+      Long value = Long.parseLong(rString.getValue()) + 1;
+
+      MAP.getString(key).setValue(String.valueOf(value));
+      returnInteger(value);
+      
+      logger.debug("INCR {} -> {}", key, value);
+    } catch (Exception e) {
+      returnError(e.getMessage());
+      logger.error("INCR {} -> {}", key, e.getMessage());
+    }
   }
 
   private void decr(String key) throws IOException {
-     if (!exists(key)) {
-      socket.getOutputStream().write(NIL);
+    if (!exists(key)) {
+      returnNil();
+      logger.debug("DECR {} -> (nil)", key);
       return;
     }
 
-    Long val = toLong(MAP.get(key)) - 1;
-    MAP.get(key).setValue(String.valueOf(val));
-    
-    returnInteger(val);
-    logger.debug("DECR {} -> {}", key, val);
+    try {
+      RString rString = MAP.getString(key);
+      Long value = Long.parseLong(rString.getValue()) - 1;
+
+      MAP.getString(key).setValue(String.valueOf(value));
+      returnInteger(value);
+      
+      logger.debug("DECR {} -> {}", key, value);
+    } catch (Exception e) {
+      returnError(e.getMessage());
+      logger.error("DECR {} -> {}", key, e.getMessage());
+    }
   }
 
   private void exists(Object[] args) throws IOException{
@@ -174,12 +189,14 @@ public class SocketHandler implements Runnable {
 
     for (int i = 1; i < args.length; i++) {
       String key = toString(args[i]);
-      if (MAP.containsKey(key)) {
+
+      if (MAP.contains(key)) {
         count++;
       }
     }
 
     returnInteger(count);
+    logger.debug("EXISTS -> {}", count);
   }
 
   private void del(Object[] args) throws IOException{
@@ -187,25 +204,91 @@ public class SocketHandler implements Runnable {
 
     for (int i = 1; i < args.length; i++) {
       String key = toString(args[i]);
-      if (MAP.containsKey(key)) {
+      if (MAP.contains(key)) {
         MAP.remove(key);
         count++;
       }
     }
 
     returnInteger(count);
+    logger.debug("EXISTS -> {}", count);
   }
 
+  private void lpush(Object[] args) throws IOException {
+    String key = toString(args[1]);
+    RList list = new RList();
+
+    for (int i = 2; i < args.length; i++) {
+      list.leftPush(toString(args[i]));
+    }
+
+    MAP.put(key, list);
+    returnSimple("OK");
+  }
+
+  private void rpush(Object[] args) throws IOException {
+    String key = toString(args[1]);
+    RList list = new RList();
+
+    for (int i = 2; i < args.length; i++) {
+      list.rigthPush(toString(args[i]));
+    }
+
+    MAP.put(key, list);
+    returnSimple("OK");
+  }
+
+  private void lindex(Object[] args) throws IOException {
+    String key = toString(args[1]);
+
+    if (!exists(key)) {
+      returnNil();
+      logger.debug("LINDEX {} -> (nil)", key);
+      return;
+    }
+
+    try {
+      RList list = MAP.getList(key);
+      Long index = toLong(args[2]);
+
+      String value = list.getValue(index);
+      returnBulk(value);
+      logger.error("LINDEX {} -> {}", key, value);
+    } catch (Exception e) {
+      returnError(e.getMessage());
+      logger.error("LINDEX {} -> {}", key, e);
+    }
+  }
+
+  private void lrange(Object[] args) throws IOException {
+    String key = toString(args[1]);
+
+    if (!exists(key)) {
+      returnNil();
+      logger.debug("LINDEX {} -> (nil)", key);
+      return;
+    }
+
+    try {
+      RList list = MAP.getList(key);
+
+      Long sIndex = toLong(args[2]);
+      Long eIndex = toLong(args[3]);
+
+      String[] values = list.getValues(sIndex, eIndex);
+      returnArray(values);
+    } catch (Exception e) {
+      returnError(e.getMessage());
+      logger.error("LRANGE {} -> {}", key, e);
+    }
+  } 
+
   private boolean exists(String key){
-    return MAP.containsKey(key);
+    return MAP.contains(key);
   }
 
   private String toString(Object obj) {
     return (String) obj;
-  }
-
-  private Integer toInt(Object obj) {
-    return Integer.parseInt(toString(obj));
   }
 
   private Long toLong(Object obj) {
@@ -236,5 +319,11 @@ public class SocketHandler implements Runnable {
   private void returnError(String err) throws IOException {
     socket.getOutputStream().write(RespSerializer.toError(err).getBytes(UTF_8));
     logger.trace("Sent Error: {}", err);
+  }
+
+  private void returnNil() throws IOException {
+    final byte[] NIL = "$-1\r\n".getBytes(UTF_8);
+    socket.getOutputStream().write(NIL);
+    logger.trace("NIL");
   }
 }

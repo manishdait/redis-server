@@ -3,16 +3,15 @@ package io.github.manishdait.redis_server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.github.manishdait.redis_server.types.RMap;
 
 public class Main {
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
-  private static final Map<String, Entity> MAP = new HashMap<>();
+  private static final RMap MAP = new RMap();
 
   public static void main(String[] args) throws IOException {
     int PORT = 6379;
@@ -25,7 +24,7 @@ public class Main {
     }
   }
 
-  public static Map<String, Entity> getMap() {
+  public static RMap getMap() {
     return Main.MAP;
   }
 }
