@@ -65,6 +65,15 @@ public class SocketHandler implements Runnable {
           case "LPUSH":
             lpush(args);
             break;
+          case "RPUSH":
+            rpush(args);
+            break;
+          case "LINDEX":
+            lindex(args);
+            break;
+          case "LRANGE":
+            lrange(args);
+            break;
           case "COMMAND":
             returnSimple("");
             break;
