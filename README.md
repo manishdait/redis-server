@@ -9,12 +9,12 @@ It supports the **RESP (Redis Serialization Protocol)** and can communicate dire
 ```bash
 git clone https://github.com/manishdait/redis-server.git
 cd redis-server
-mvn clean package
+./mvnw clean package
 ```
 
 ### Run the Server
 ```bash
-mvn exec:java -Dexec.mainClass="io.github.manishdait.redis_server.Main"
+./mvnw exec:java -Dexec.mainClass="io.github.manishdait.redis_server.Main"
 ```
 
 The server starts on port `6379` (the default Redis port).
