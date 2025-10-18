@@ -47,6 +47,14 @@ public class RString implements RType {
     setExpiration(Instant.ofEpochMilli(millis));
   }
 
+  public boolean hasExpire() {
+    if (this.getExpiration() == null){
+      return false;
+    }
+    
+    return this.getExpiration().isBefore(Instant.now());
+  }
+
   @Override
   public String toString() {
     return "RString [value=" + value + ", expiration=" + expiration + "]";

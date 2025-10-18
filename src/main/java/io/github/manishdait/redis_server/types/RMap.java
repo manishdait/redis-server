@@ -2,6 +2,7 @@ package io.github.manishdait.redis_server.types;
 
 import java.io.Serializable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
 
 public class RMap implements Serializable {
   private final ConcurrentHashMap<String, RType> MAP;
@@ -44,5 +45,9 @@ public class RMap implements Serializable {
     }
 
     throw new RuntimeException("WRONG-TYPE");
+  }
+
+  public KeySetView<String, RType> keys() {
+    return MAP.keySet();
   }
 }

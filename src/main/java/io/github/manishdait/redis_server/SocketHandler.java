@@ -147,8 +147,15 @@ public class SocketHandler implements Runnable {
 
     try {
       RString rString = MAP.getString(key);
-      returnBulk(rString.getValue());
 
+      if (rString.hasExpire()) {
+        MAP.remove(key);
+        logger.debug("Key has expired", key);
+        returnNil();
+        return;
+      }
+
+      returnBulk(rString.getValue());
       logger.debug("GET {} -> {}", key, rString);
     } catch (Exception e) {
       returnError(e.getMessage());
@@ -165,6 +172,14 @@ public class SocketHandler implements Runnable {
 
     try {
       RString rString = MAP.getString(key);
+
+      if (rString.hasExpire()) {
+        MAP.remove(key);
+        logger.debug("Key has expired", key);
+        returnNil();
+        return;
+      }
+
       Long value = Long.parseLong(rString.getValue()) + 1;
 
       MAP.getString(key).setValue(String.valueOf(value));
@@ -187,6 +202,13 @@ public class SocketHandler implements Runnable {
     try {
       RString rString = MAP.getString(key);
       Long value = Long.parseLong(rString.getValue()) - 1;
+
+      if (rString.hasExpire()) {
+        MAP.remove(key);
+        logger.debug("Key has expired", key);
+        returnNil();
+        return;
+      }
 
       MAP.getString(key).setValue(String.valueOf(value));
       returnInteger(value);

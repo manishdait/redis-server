@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,8 +21,17 @@ public class Main {
     int PORT = 6379;
     ServerSocket server = new ServerSocket(PORT);
     logger.info("Server started at port " + PORT);
-
     loadInitData();
+
+    Timer timer = new Timer();
+    TimerTask timerTask = new TimerTask() {
+      @Override
+      public void run() {
+        cleanExpiry();
+      }
+    };
+
+    timer.scheduleAtFixedRate(timerTask, 0, 30000);
 
     while (true) {
       Socket socket = server.accept();
@@ -42,8 +53,16 @@ public class Main {
 
       logger.info("Data import successfull");
     } catch (Exception e) {
-      e.printStackTrace();
       MAP = new RMap();
+    }
+  }
+
+  private static void cleanExpiry() {
+    for (String key : MAP.keys()) {
+      if (MAP.getString(key).hasExpire()) {
+        MAP.remove(key);
+        logger.debug("Cleaning expired key {}", key);;
+      }
     }
   }
 }
