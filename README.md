@@ -37,4 +37,5 @@ redis-cli -p 6379
 | LPUSH / RPUSH `<key>` `<value>...` |	Pushes values into lists (left/right) |
 | LINDEX `<key>` `<index>` |	Retrieves list item at index |
 | LRANGE `<key>` `<start>` `<end>` | Gets a slice of list values |
+| SAVE | Save the database state to disk |
 
