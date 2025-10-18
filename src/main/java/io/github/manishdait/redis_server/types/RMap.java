@@ -1,8 +1,9 @@
 package io.github.manishdait.redis_server.types;
 
+import java.io.Serializable;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class RMap {
+public class RMap implements Serializable {
   private final ConcurrentHashMap<String, RType> MAP;
 
   public RMap() {

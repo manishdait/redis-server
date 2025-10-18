@@ -1,5 +1,7 @@
 package io.github.manishdait.redis_server.types;
 
-public interface RType {
+import java.io.Serializable;
+
+public interface RType extends Serializable {
   
 }

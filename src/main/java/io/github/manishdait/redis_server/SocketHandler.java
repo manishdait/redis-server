@@ -1,6 +1,8 @@
 package io.github.manishdait.redis_server;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -73,6 +75,9 @@ public class SocketHandler implements Runnable {
             break;
           case "LRANGE":
             lrange(args);
+            break;
+          case "SAVE":
+            save();
             break;
           case "COMMAND":
             returnSimple("");
@@ -290,7 +295,16 @@ public class SocketHandler implements Runnable {
       returnError(e.getMessage());
       logger.error("LRANGE {} -> {}", key, e);
     }
-  } 
+  }
+
+  private void save() throws IOException {
+    FileOutputStream fileStream = new FileOutputStream("dump");
+    ObjectOutputStream out = new ObjectOutputStream(fileStream);
+
+    out.writeObject(MAP);
+    out.close();
+    returnSimple("OK");
+  }
 
   private boolean exists(String key){
     return MAP.contains(key);
